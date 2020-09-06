@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 import scrapy
-from gerapy_pyppeteer import PyppeteerRequest
+from gerapy_selenium import SeleniumRequest
 from scrapy import Request, signals
 from example.items import MovieItem
 import logging
@@ -25,7 +25,7 @@ class MovieSpider(scrapy.Spider):
             cookies = {
                 'name': 'germey'
             }
-            yield PyppeteerRequest(url, callback=self.parse_index, priority=10, wait_for='.item', pretend=True, cookies=cookies)
+            yield SeleniumRequest(url, callback=self.parse_index, priority=10, wait_for='.item', pretend=True, cookies=cookies)
     
     def parse_index(self, response):
         """
@@ -38,7 +38,7 @@ class MovieSpider(scrapy.Spider):
             href = item.css('a::attr(href)').extract_first()
             detail_url = response.urljoin(href)
             logger.info('detail url %s', detail_url)
-            yield PyppeteerRequest(detail_url, callback=self.parse_detail, wait_for='.item')
+            yield SeleniumRequest(detail_url, callback=self.parse_detail, wait_for='.item')
     
     def parse_detail(self, response):
         """

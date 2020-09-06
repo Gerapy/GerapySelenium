@@ -20,10 +20,10 @@ def read_requirements(filename):
             if not line.startswith('#')]
 
 
-NAME = 'gerapy-pyppeteer'
-FOLDER = 'gerapy_pyppeteer'
-DESCRIPTION = 'Pyppeteer Components for Scrapy & Gerapy'
-URL = 'https://github.com/Gerapy/GerapyPyppeteer'
+NAME = 'gerapy-selenium'
+FOLDER = 'gerapy_selenium'
+DESCRIPTION = 'Selenium Components for Scrapy & Gerapy'
+URL = 'https://github.com/Gerapy/GerapySelenium'
 EMAIL = 'cqc@cuiqingcai.com'
 AUTHOR = 'Germey'
 REQUIRES_PYTHON = '>=3.6.0'
