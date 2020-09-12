@@ -1,10 +1,10 @@
-SET_WEBDRIVER = '''() => {Object.defineProperty(navigator, 'webdriver', {get: () => undefined})}'''
-SET_USER_AGENT = '''() => {Object.defineProperty(navigator, 'userAgent', {get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'})}'''
-SET_APP_VERSION = '''() => {Object.defineProperty(navigator, 'appVersion', {get: () => '5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'})}'''
-EXTEND_LANGUAGES = '''() => {Object.defineProperty(navigator, 'languages', {get: () => ['zh-CN', 'zh', 'en', 'zh-TW', 'ja']})}'''
-EXTEND_PLUGINS = '''() => {Object.defineProperty(navigator, 'plugins', {get: () => [0, 1, 2, 3, 4]})}'''
-EXTEND_MIME_TYPES = '''() => {Object.defineProperty(navigator, 'mimeTypes', {get: () => [0, 1, 2, 3, 4]})}'''
-SET_WEBGL = '''() => {
+SET_WEBDRIVER = '''Object.defineProperty(navigator, 'webdriver', {get: () => undefined})'''
+SET_USER_AGENT = '''Object.defineProperty(navigator, 'userAgent', {get: () => 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'})'''
+SET_APP_VERSION = '''Object.defineProperty(navigator, 'appVersion', {get: () => '5.0 (Macintosh; Intel Mac OS X 10_15_4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/83.0.4103.116 Safari/537.36'})'''
+EXTEND_LANGUAGES = '''Object.defineProperty(navigator, 'languages', {get: () => ['zh-CN', 'zh', 'en', 'zh-TW', 'ja']})'''
+EXTEND_PLUGINS = '''Object.defineProperty(navigator, 'plugins', {get: () => [0, 1, 2, 3, 4]})'''
+EXTEND_MIME_TYPES = '''Object.defineProperty(navigator, 'mimeTypes', {get: () => [0, 1, 2, 3, 4]})'''
+SET_WEBGL = '''
     const getParameter = WebGLRenderingContext.getParameter
     WebGLRenderingContext.prototype.getParameter = (parameter) => {
       if (parameter === 37445) {
@@ -15,9 +15,8 @@ SET_WEBGL = '''() => {
       }
       return getParameter(parameter)
     }
-  }
 '''
-SET_CHROME_INFO = '''() => {
+SET_CHROME_INFO = '''
   Object.defineProperty(window, 'chrome', {
     "app": {
       "isInstalled": false,
@@ -56,17 +55,15 @@ SET_CHROME_INFO = '''() => {
       }
     }
   })
-}
 '''
 
-SET_PERMISSION = '''() => {
+SET_PERMISSION = '''
   const originalQuery = window.navigator.permissions.query;
   return window.navigator.permissions.query = (parameters) => (
     parameters.name === 'notifications' ?
       Promise.resolve({ state: Notification.permission }) :
       originalQuery(parameters)
   )
-}
 '''
 
 SCRIPTS = [

@@ -1,8 +1,8 @@
-import json
 import time
 from io import BytesIO
 from scrapy.http import HtmlResponse
 from scrapy.utils.python import global_object_name
+from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from gerapy_selenium.pretend import SCRIPTS as PRETEND_SCRIPTS
@@ -76,17 +76,8 @@ class SeleniumMiddleware(object):
         cls.window_width = settings.get('GERAPY_SELENIUM_WINDOW_WIDTH', GERAPY_SELENIUM_WINDOW_WIDTH)
         cls.window_height = settings.get('GERAPY_SELENIUM_WINDOW_HEIGHT', GERAPY_SELENIUM_WINDOW_HEIGHT)
         cls.headless = settings.get('GERAPY_SELENIUM_HEADLESS', GERAPY_SELENIUM_HEADLESS)
-        cls.dumpio = settings.get('GERAPY_SELENIUM_DUMPIO', GERAPY_SELENIUM_DUMPIO)
         cls.ignore_https_errors = settings.get('GERAPY_SELENIUM_IGNORE_HTTPS_ERRORS',
                                                GERAPY_SELENIUM_IGNORE_HTTPS_ERRORS)
-        cls.slow_mo = settings.get('GERAPY_SELENIUM_SLOW_MO', GERAPY_SELENIUM_SLOW_MO)
-        cls.ignore_default_args = settings.get('GERAPY_SELENIUM_IGNORE_DEFAULT_ARGS',
-                                               GERAPY_SELENIUM_IGNORE_DEFAULT_ARGS)
-        cls.handle_sigint = settings.get('GERAPY_SELENIUM_HANDLE_SIGINT', GERAPY_SELENIUM_HANDLE_SIGINT)
-        cls.handle_sigterm = settings.get('GERAPY_SELENIUM_HANDLE_SIGTERM', GERAPY_SELENIUM_HANDLE_SIGTERM)
-        cls.handle_sighup = settings.get('GERAPY_SELENIUM_HANDLE_SIGHUP', GERAPY_SELENIUM_HANDLE_SIGHUP)
-        cls.auto_close = settings.get('GERAPY_SELENIUM_AUTO_CLOSE', GERAPY_SELENIUM_AUTO_CLOSE)
-        cls.devtools = settings.get('GERAPY_SELENIUM_DEVTOOLS', GERAPY_SELENIUM_DEVTOOLS)
         cls.executable_path = settings.get('GERAPY_SELENIUM_EXECUTABLE_PATH', GERAPY_SELENIUM_EXECUTABLE_PATH)
         cls.disable_extensions = settings.get('GERAPY_SELENIUM_DISABLE_EXTENSIONS',
                                               GERAPY_SELENIUM_DISABLE_EXTENSIONS)
@@ -98,7 +89,7 @@ class SeleniumMiddleware(object):
         cls.disable_gpu = settings.get('GERAPY_SELENIUM_DISABLE_GPU', GERAPY_SELENIUM_DISABLE_GPU)
         cls.download_timeout = settings.get('GERAPY_SELENIUM_DOWNLOAD_TIMEOUT',
                                             settings.get('DOWNLOAD_TIMEOUT', GERAPY_SELENIUM_DOWNLOAD_TIMEOUT))
-
+        
         cls.screenshot = settings.get('GERAPY_SELENIUM_SCREENSHOT', GERAPY_SELENIUM_SCREENSHOT)
         cls.pretend = settings.get('GERAPY_SELENIUM_PRETEND', GERAPY_SELENIUM_PRETEND)
         cls.sleep = settings.get('GERAPY_SELENIUM_SLEEP', GERAPY_SELENIUM_SLEEP)
@@ -116,38 +107,32 @@ class SeleniumMiddleware(object):
         :param spider:
         :return:
         """
+        kwargs = {}
         options = ChromeOptions()
+        kwargs['options'] = options
+        if self.headless:
+            options.add_argument('--headless')
         if self.pretend:
             options.add_experimental_option('excludeSwitches', ['enable-automation'])
             options.add_experimental_option('useAutomationExtension', False)
         if self.executable_path:
-            options['executable_path'] = self.executable_path
-        # if self.ignore_https_errors:
-        #     options['ignoreHTTPSErrors'] = self.ignore_https_errors
-        # if self.slow_mo:
-        #     options['slowMo'] = self.slow_mo
-        # if self.ignore_default_args:
-        #     options['ignoreDefaultArgs'] = self.ignore_default_args
-        # if self.handle_sigint:
-        #     options['handleSIGINT'] = self.handle_sigint
-        # if self.handle_sigterm:
-        #     options['handleSIGTERM'] = self.handle_sigterm
-        # if self.handle_sighup:
-        #     options['handleSIGHUP'] = self.handle_sighup
-        # if self.auto_close:
-        #     options['autoClose'] = self.auto_close
-        # if self.disable_extensions:
-        #     options['args'].append('--disable-extensions')
-        # if self.hide_scrollbars:
-        #     options['args'].append('--hide-scrollbars')
-        # if self.mute_audio:
-        #     options['args'].append('--mute-audio')
-        # if self.no_sandbox:
-        #     options['args'].append('--no-sandbox')
-        # if self.disable_setuid_sandbox:
-        #     options['args'].append('--disable-setuid-sandbox')
-        # if self.disable_gpu:
-        #     options['args'].append('--disable-gpu')
+            kwargs['executable_path'] = self.executable_path
+        if self.window_width and self.window_height:
+            options.add_argument(f'--window-size={self.window_width},{self.window_height}')
+        if self.disable_gpu:
+            options.add_argument('--disable-gpu')
+        if self.hide_scrollbars:
+            options.add_argument('--hide-scrollbars')
+        if self.ignore_https_errors:
+            options.add_argument('--ignore-certificate-errors')
+        if self.disable_extensions:
+            options.add_argument('--disable-extensions')
+        if self.mute_audio:
+            options.add_argument('--mute-audio')
+        if self.no_sandbox:
+            options.add_argument('--no-sandbox')
+        if self.disable_setuid_sandbox:
+            options.add_argument('--disable-setuid-sandbox')
         
         # get selenium meta
         selenium_meta = request.meta.get('selenium') or {}
@@ -160,7 +145,7 @@ class SeleniumMiddleware(object):
         if _proxy:
             options.add_argument('--proxy-server=' + _proxy)
         
-        browser = webdriver.Chrome(options=options)
+        browser = webdriver.Chrome(**kwargs)
         browser.set_window_size(self.window_width, self.window_height)
         
         # pretend as normal browser
@@ -172,6 +157,17 @@ class SeleniumMiddleware(object):
                 browser.execute_cdp_cmd('Page.addScriptToEvaluateOnNewDocument', {
                     'source': script
                 })
+        
+        _timeout = self.download_timeout
+        if selenium_meta.get('timeout') is not None:
+            _timeout = selenium_meta.get('timeout')
+        browser.set_page_load_timeout(_timeout)
+        
+        try:
+            browser.get(request.url)
+        except TimeoutException:
+            browser.close()
+            return self._retry(request, 504, spider)
         
         # set cookies
         parse_result = urllib.parse.urlsplit(request.url)
@@ -186,17 +182,8 @@ class SeleniumMiddleware(object):
                     _cookie['domain'] = domain
         for _cookie in _cookies:
             browser.add_cookie(_cookie)
-        
-        _timeout = self.download_timeout
-        if selenium_meta.get('timeout') is not None:
-            _timeout = selenium_meta.get('timeout')
-        browser.set_page_load_timeout(_timeout)
-        
-        try:
-            browser.get(request.url)
-        except TypeError:
-            browser.close()
-            return self._retry(request, 504, spider)
+        if _cookies:
+            browser.refresh()
         
         # wait for dom loaded
         if selenium_meta.get('wait_for'):
@@ -206,7 +193,7 @@ class SeleniumMiddleware(object):
                 WebDriverWait(browser, _timeout).until(
                     EC.presence_of_element_located((By.CSS_SELECTOR, _wait_for))
                 )
-            except TypeError:
+            except TimeoutException:
                 logger.error('error waiting for %s of %s', _wait_for, request.url)
                 browser.close()
                 return self._retry(request, 504, spider)
@@ -231,15 +218,17 @@ class SeleniumMiddleware(object):
         _screenshot = self.screenshot
         if selenium_meta.get('screenshot') is not None:
             _screenshot = selenium_meta.get('screenshot')
-        screenshot = None
-        if _screenshot:
-            # pop path to not save img directly in this middleware
-            if isinstance(_screenshot, dict) and 'path' in _screenshot.keys():
-                _screenshot.pop('path')
+        screenshot_result = None
+        if _screenshot is not None:
             logger.debug('taking screenshot using args %s', _screenshot)
-            screenshot = browser.get_screenshot_as_png()
-            if isinstance(screenshot, bytes):
-                screenshot = BytesIO(screenshot)
+            if 'selector' in _screenshot:
+                screenshot_result = browser.find_element_by_css_selector(_screenshot['selector']).screenshot_as_png
+            elif 'xpath' in _screenshot:
+                screenshot_result = browser.find_element_by_xpath(_screenshot['xpath']).screenshot_as_png
+            else:
+                screenshot_result = browser.get_screenshot_as_png()
+            if isinstance(screenshot_result, bytes):
+                screenshot_result = BytesIO(screenshot_result)
         
         # close page and browser
         logger.debug('close selenium')
@@ -252,8 +241,8 @@ class SeleniumMiddleware(object):
             encoding='utf-8',
             request=request
         )
-        if screenshot:
-            response.meta['screenshot'] = screenshot
+        if screenshot_result:
+            response.meta['screenshot'] = screenshot_result
         return response
     
     def process_request(self, request, spider):
