@@ -1,2 +1,2 @@
 scrapy>=1.5.0
-selenium
+selenium>=3.5.0
